@@ -96,7 +96,7 @@ class SPIWhatsAppEmailsParser(object):
 	class WhatsApp_Email_Parser:
 		def parse_message(self,str):
 			for pattern in map(lambda x:x+SPIWhatsAppEmailsParser.message_pattern, SPIWhatsAppEmailsParser.date_patterns.values()):
-				m = re.match(pattern, str)
+				m = re.search(pattern, str)
 				#if m:
 				#	print 'MSG:',m.group('datetime')
 				if m:
@@ -104,11 +104,11 @@ class SPIWhatsAppEmailsParser(object):
 
 			# if code comes here, message is continuation or action
 			for pattern in map(lambda x:x+SPIWhatsAppEmailsParser.action_pattern, SPIWhatsAppEmailsParser.date_patterns.values()):
-				m = re.match(pattern, str)
+				m = re.search(pattern, str)
 				if m:
 					if any(action_string in m.group('action') for action_string in SPIWhatsAppEmailsParser.action_strings.values()):
 						for pattern in map(lambda x: "(?P<name>(.*?))"+x+"(.*?)", SPIWhatsAppEmailsParser.action_strings.values()):
-							m_action = re.match(pattern, m.group('action'))
+							m_action = re.search(pattern, m.group('action'))
 							if m_action:
 								return (m.group('datetime'), m_action.group('name'), None, m.group('action'))
 
