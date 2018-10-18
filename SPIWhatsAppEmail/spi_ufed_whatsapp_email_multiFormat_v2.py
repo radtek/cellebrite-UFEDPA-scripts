@@ -13,6 +13,9 @@ Python Version: 2.7.13
 Description: A UFED PA Script to load Whatsapp's export to email (or similar) files on Physical Analyser chat section.
 Copyright: 2018 Alberto Magno <alberto.magno@gmail.com> 
 URL: https://github.com/kraftdenker/cellebrite-UFEDPA-scripts
+
+Based on project https://github.com/hiimivantang/whatsapp-analytics
+The MIT License (MIT) Copyright (c) 2016 hiimivantang
 --
 - ChangeLog -
 v1 - [24-10-17]: Wrote original code
