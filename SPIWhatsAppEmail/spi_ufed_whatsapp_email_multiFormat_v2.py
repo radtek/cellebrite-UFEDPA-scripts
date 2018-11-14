@@ -5,22 +5,6 @@ from struct import *
 from array import array
 import time, codecs, time, sys, re, os, datetime
 
-'''
-Script Name: spi_ufed_whatsapp_email_multiFormat_v2.py
-Version: 2
-Revised Date: 11/09/18
-Python Version: 2.7.13
-Description: A UFED PA Script to load Whatsapp's export to email (or similar) files on Physical Analyser chat section.
-Copyright: 2018 Alberto Magno <alberto.magno@gmail.com> 
-URL: https://github.com/kraftdenker/cellebrite-UFEDPA-scripts
-
-Based on project https://github.com/hiimivantang/whatsapp-analytics
-The MIT License (MIT) Copyright (c) 2016 hiimivantang
---
-- ChangeLog -
-v1 - [24-10-17]: Wrote original code
-v2 - [11-09-18]: Expanded date_patterns to variations based on device's configuration.
-'''
 
 #planejamento codigo do processador
 
@@ -43,7 +27,7 @@ class SPIWhatsAppEmailsParser(object):
 	chats = {}
 	sec_chats = {}
 	
-	date_patterns = {"datetime_format_1" : "(?P<datetime>\d{2}/\d{2}/\d{2}\s{1}\d{1,2}:\d{1,2})", "datetime_format_2" : "(?P<datetime>\d{2}/\d{2}/\d{2},\s{1}\d{1,2}:\d{1,2})", "datetime_format_3" : "(?P<datetime>\d{2}/\d{2}/\d{2},\s{1}\d{1,2}:\d{1,2}\s{1}(A|P)M)", "datetime_format_4" : "(?P<datetime>\d{2}/\d{2}/\d{4},\s{1}\d{1,2}:\d{1,2})"} 
+	date_patterns = {"datetime_format_1" : "(?P<datetime>\d{2}/\d{2}/\d{2}\s{1}\d{1,2}:\d{1,2})", "datetime_format_2" : "(?P<datetime>\d{2}/\d{2}/\d{2},\s{1}\d{1,2}:\d{1,2})", "datetime_format_3" : "(?P<datetime>\d{2}/\d{2}/\d{2},\s{1}\d{1,2}:\d{1,2}\s{1}(A|P)M)", "datetime_format_4" : "(?P<datetime>\d{2}/\d{2}/\d{4},\s{1}\d{1,2}:\d{1,2})", "datetime_format_5" : "(?P<datetime>\d{2}/\d{2}/\d{4}\s{1}\d{1,2}:\d{1,2})"} 
 	#date_format_1 dd/MM/yyyy HH24:mm #date_format_2 dd/MM/yyyy, HH24:mm #date_format_3 dd/MM/yyyy, HH:mm
 	message_pattern = "\s{1}-\s{1}(?P<name>(.*?)):\s{1}(?P<message>(.*?))$"
 	action_pattern = "\s{1}-\s{1}(?P<action>(.*?))$"
@@ -99,7 +83,7 @@ class SPIWhatsAppEmailsParser(object):
 	class WhatsApp_Email_Parser:
 		def parse_message(self,str):
 			for pattern in map(lambda x:x+SPIWhatsAppEmailsParser.message_pattern, SPIWhatsAppEmailsParser.date_patterns.values()):
-				m = re.search(pattern, str)
+				m = re.match(pattern, str)
 				#if m:
 				#	print 'MSG:',m.group('datetime')
 				if m:
@@ -107,18 +91,18 @@ class SPIWhatsAppEmailsParser(object):
 
 			# if code comes here, message is continuation or action
 			for pattern in map(lambda x:x+SPIWhatsAppEmailsParser.action_pattern, SPIWhatsAppEmailsParser.date_patterns.values()):
-				m = re.search(pattern, str)
+				m = re.match(pattern, str)
 				if m:
 					if any(action_string in m.group('action') for action_string in SPIWhatsAppEmailsParser.action_strings.values()):
 						for pattern in map(lambda x: "(?P<name>(.*?))"+x+"(.*?)", SPIWhatsAppEmailsParser.action_strings.values()):
-							m_action = re.search(pattern, m.group('action'))
+							m_action = re.match(pattern, m.group('action'))
 							if m_action:
 								return (m.group('datetime'), m_action.group('name'), None, m.group('action'))
 
 						sys.stderr.write("[failed to capture name from action] - %s\n" %(m.group('action')))
 						return (m.group('datetime'), None, None, m.group('action'))
 
-			#prone to return invalid continuation if above filtering doesn't cover all patterns for messages and actions
+			#prone to return invalid continuation if above filtering doesn't cover all patterns for messages and actions           
 			return (None, None, str, None)
 		def process(self, content):
 			messages = []
@@ -256,7 +240,6 @@ class SPIWhatsAppEmailsParser(object):
 			else:
 				print "no match!!"
 	def findFile(self,fileName):
-		print " ****** " + fileName
 		for fs in self.fsNodesOrdered:
 			foundFile = fs.GetFirstNode(fileName)
 			if not foundFile is None:
