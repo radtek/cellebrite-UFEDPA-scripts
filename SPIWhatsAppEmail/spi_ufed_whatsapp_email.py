@@ -18,6 +18,9 @@ URL: https://github.com/kraftdenker/cellebrite-UFEDPA-scripts
 v1 - [24-10-17]: Wrote original code
 v2 - [11-09-18]: Expanded date_patterns to variations based on device's configuration.
 v3 - [14-11-18]: Added new data format found in exams
+
+Part of this code is based on project
+https://github.com/hiimivantang/whatsapp-analytics licensed under the MIT License
 '''
 
 #planejamento codigo do processador
