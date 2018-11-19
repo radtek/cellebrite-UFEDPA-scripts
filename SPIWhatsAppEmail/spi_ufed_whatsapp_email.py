@@ -5,6 +5,20 @@ from struct import *
 from array import array
 import time, codecs, time, sys, re, os, datetime
 
+'''
+Script Name: spi_ufed_whatsapp_email.py
+Version: 2.1
+Revised Date: 11/09/18
+Python Version: 2.7.13
+Description: A UFED PA Script to load Whatsapp's export to email (or similar) files on Physical Analyser chat section.
+Copyright: 2018 Alberto Magno <alberto.magno@gmail.com> 
+URL: https://github.com/kraftdenker/cellebrite-UFEDPA-scripts
+--
+- ChangeLog -
+v1 - [24-10-17]: Wrote original code
+v2 - [11-09-18]: Expanded date_patterns to variations based on device's configuration.
+v3 - [14-11-18]: Added new data format found in exams
+'''
 
 #planejamento codigo do processador
 
