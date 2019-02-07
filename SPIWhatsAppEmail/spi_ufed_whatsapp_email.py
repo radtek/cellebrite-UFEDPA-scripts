@@ -18,10 +18,33 @@ URL: https://github.com/kraftdenker/cellebrite-UFEDPA-scripts
 v1 - [24-10-17]: Wrote original code
 v2 - [11-09-18]: Expanded date_patterns to variations based on device's configuration.
 v3 - [14-11-18]: Added new data format found in exams
+v4 - [07-02-19]: Solution to extraction without contact file and extractions with "no-sense" encoding (strange prefix bytes in messagelines)
 
 Part of this code is based on project
 https://github.com/hiimivantang/whatsapp-analytics licensed under the MIT License
 '''
+
+#planejamento codigo do processador
+
+# localizar arquivos no diretorio com filtragem por nome
+# processar arquivo de contatos (contacts.txt) nome=jid.
+# loop conversas
+#	abrir cada arquivo de conversas ("Conversa do WhatsApp com [NOME_CHAT].txt")
+#	abrir um chat no UFED baseado no nome do arquivo identificado.
+#	loop linhas
+#
+#		processar as linhas (##/##/##, prefixo identificador de linha) 
+#		linha ##/##/##, HH:MM - [CONTATO]:contains[arquivo anexado]?buscarArquivoAnexar
+#			?buscar anexo 
+
+from physical import *
+import SQLiteParser
+import string
+from System.Convert import IsDBNull
+from struct import *
+from array import array
+import time, codecs, time, sys, re, os, datetime
+
 
 #planejamento codigo do processador
 
@@ -65,7 +88,7 @@ class SPIWhatsAppEmailsParser(object):
 			#print datetime
 			#normalize date data
 			# datetime_format_1 and 2 HH24
-			matchDateTime = re.match(r'(?P<day>\d{1,2})/(?P<month>\d{1,2})/(?P<year>\d{2,4})[,]{0,1}\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})',datetime)
+			matchDateTime = re.search(r'(?P<day>\d{1,2})/(?P<month>\d{1,2})/(?P<year>\d{2,4})[,]{0,1}\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})',datetime)
 			yearPlus = 0
 			if not matchDateTime is None:
 				if (len(matchDateTime.group('year'))==2):
@@ -74,7 +97,7 @@ class SPIWhatsAppEmailsParser(object):
 				self.datetime = TimeStamp(dt)
 			#datetime_format_3 HH12 AM - PM
 			else:
-				matchDateTime = re.match(r'(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2}),\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})\s[1](?P<ampm>((A|P)M))',datetime)
+				matchDateTime = re.search(r'(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2}),\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})\s[1](?P<ampm>((A|P)M))',datetime)
 				if not matchDateTime is None:
 					HH12 = 0
 					if matchDateTime.group('ampm').contains('P'):
@@ -100,7 +123,7 @@ class SPIWhatsAppEmailsParser(object):
 	class WhatsApp_Email_Parser:
 		def parse_message(self,str):
 			for pattern in map(lambda x:x+SPIWhatsAppEmailsParser.message_pattern, SPIWhatsAppEmailsParser.date_patterns.values()):
-				m = re.match(pattern, str)
+				m = re.search(pattern, str)
 				#if m:
 				#	print 'MSG:',m.group('datetime')
 				if m:
@@ -108,11 +131,11 @@ class SPIWhatsAppEmailsParser(object):
 
 			# if code comes here, message is continuation or action
 			for pattern in map(lambda x:x+SPIWhatsAppEmailsParser.action_pattern, SPIWhatsAppEmailsParser.date_patterns.values()):
-				m = re.match(pattern, str)
+				m = re.search(pattern, str)
 				if m:
 					if any(action_string in m.group('action') for action_string in SPIWhatsAppEmailsParser.action_strings.values()):
 						for pattern in map(lambda x: "(?P<name>(.*?))"+x+"(.*?)", SPIWhatsAppEmailsParser.action_strings.values()):
-							m_action = re.match(pattern, m.group('action'))
+							m_action = re.search(pattern, m.group('action'))
 							if m_action:
 								return (m.group('datetime'), m_action.group('name'), None, m.group('action'))
 
@@ -227,7 +250,11 @@ class SPIWhatsAppEmailsParser(object):
 
 		
 		#going over the contacts files 
-		contacts = self.load_property_java_file(pathContactFile)
+		try:
+			contacts = self.load_property_java_file(pathContactFile)
+		except:
+			print 'No contacts.txt file found... (skiping)'
+			return
 		for k in contacts.keys():	  
 			#creating new UserID field
 			uid = UserID()
@@ -249,25 +276,33 @@ class SPIWhatsAppEmailsParser(object):
 		linst_of_messages = []
 		set_of_sender = set()
 		for l in lines:
-			matchChat = re.match(r'(?P<date>\d{2}/\d{2}/\d{2})(?P<time>\s{1}\d{2}:\d{2})\s{1}-\s{1}(?P<name>(.*?)):\s{1}(?P<message>(.*?))$',line)
+			matchChat = re.search(r'(?P<date>\d{2}/\d{2}/\d{2})(?P<time>\s{1}\d{2}:\d{2})\s{1}-\s{1}(?P<name>(.*?)):\s{1}(?P<message>(.*?))$',line)
 			if matchChat:
 				print matchChat.group()
 				print matchChat.group(1)
 				print matchChat.group(2)
 			else:
 				print "no match!!"
+	
+	def stripNonAlphaNum(self,text):
+		return re.compile(r'\W+', re.UNICODE).split(text)
+
 	def findFile(self,fileName):
-		for fs in self.fsNodesOrdered:
-			foundFile = fs.GetFirstNode(fileName)
-			if not foundFile is None:
-				return foundFile
+		print 'Searching...',fileName+' '+fileName.encode('hex'),''.join([x for x in fileName if x in string.printable])
+		for fs in ds.FileSystems:#self.fsNodesOrdered:
+			foundFiles = fs.Search(''.join([x for x in fileName if x in string.printable]))
+			for file in foundFiles:
+				if not file is None:
+					return file
+		print 'Not found'
 		return None
+		
 	def decode_messages(self):
-		files = [f for f in os.listdir(currentDir) if re.match(r'Conversa do WhatsApp com (.*)\.txt', f)]
+		files = [f for f in os.listdir(currentDir) if re.search(r'Conversa do WhatsApp com (.*)\.txt', f)]
 		repeated_chats = []
 		for f in files:
 			#todo: remove repeated extraction files.
-			"""repeted_extraction_parse = re.match(r'Conversa do WhatsApp com (.*)\(\d\)\.txt', f)
+			"""repeted_extraction_parse = re.search(r'Conversa do WhatsApp com (.*)\(\d\)\.txt', f)
 			if not repeted_extraction_parse is None:
 				print "Chat ",f,"repeated."
 				repeated_chats.add(f)
@@ -279,7 +314,7 @@ class SPIWhatsAppEmailsParser(object):
 			content = ws_chat.open_file()
 			chat = Chat()
 			chat.Deleted = DeletedState.Intact
-			rchat_name_parser = re.match(r'Conversa do WhatsApp com (.*)\.txt', f)
+			rchat_name_parser = re.search(r'Conversa do WhatsApp com (.*)\.txt', f)
 			chat.Id.Value = rchat_name_parser.group(1)
 			chat.Source.Value = "WhatsApp (EmailExport)"
 			ws_parser = self.WhatsApp_Email_Parser()
@@ -293,19 +328,19 @@ class SPIWhatsAppEmailsParser(object):
 				im.Deleted = DeletedState.Intact
 				if m.action is None:
 					im.Body.Value = m.message
-					anexo_parser = re.match(r'(.*)\s\(arquivo anexado\)', m.message)
+					anexo_parser = re.search(r'(.*)\s\(arquivo anexado\)', m.message)
 					if not anexo_parser is None: #has attachement
 							att = Attachment()
 							att.Filename.Value = anexo_parser.group(1)
 							att.Deleted = DeletedState.Intact
 							
-							r = self.findFile(anexo_parser.group(1))
+							r = self.findFile(anexo_parser.group(1).strip())
 							if not r is None:
 								att.Data.Source = r.Data
 								im.Attachments.Add(att)
 							else:
 								print "!!!WARNING!!! Attachment file not found:",anexo_parser.group(1)
-					anexo_ausente = re.match(r'<M\w{1}dia omitida>', m.message)
+					anexo_ausente = re.search(r'<M\w{1}dia omitida>', m.message)
 					if not anexo_ausente is None: 
 						im.Body.Value = im.Body.Value+"-<O anexo nao foi localizado no dispositivo>"
 								
@@ -343,3 +378,4 @@ pathContactFile = currentDir+'/contacts.txt'
 results = SPIWhatsAppEmailsParser().parse()
 
 print "Finished",('The script took {0} seconds !'.format(time.time() - startTime))
+
