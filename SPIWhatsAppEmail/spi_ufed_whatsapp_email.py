@@ -288,13 +288,13 @@ class SPIWhatsAppEmailsParser(object):
 		return re.compile(r'\W+', re.UNICODE).split(text)
 
 	def findFile(self,fileName):
-		print 'Searching...',fileName+' '+fileName.encode('hex'),''.join([x for x in fileName if x in string.printable])
+		#print 'Searching...',fileName+' '+fileName.encode('hex'),''.join([x for x in fileName if x in string.printable])
 		for fs in ds.FileSystems:#self.fsNodesOrdered:
 			foundFiles = fs.Search(''.join([x for x in fileName if x in string.printable]))
 			for file in foundFiles:
 				if not file is None:
 					return file
-		print 'Not found'
+		#print 'Not found'
 		return None
 		
 	def decode_messages(self):
