@@ -20,7 +20,7 @@ v1 - [24-10-17]: Wrote original code
 v2 - [11-09-18]: Expanded date_patterns to variations based on device's configuration.
 v3 - [14-11-18]: Added new data format found in exams
 v4 - [07-02-19]: Solution to extraction without contact file and extractions with "no-sense" encoding (strange prefix bytes in messagelines)
-v5 - [25-02-19]: Added new date format with dayshift [morning, afternoon, ... :/]
+v5 - [25-02-19]: Added new date format with dayshift [morning, afternoon, midnight,... :/]
 
 Part of this code is based on project
 https://github.com/hiimivantang/whatsapp-analytics licensed under the MIT License
@@ -70,7 +70,7 @@ class SPIWhatsAppEmailsParser(object):
 	sec_chats = {}
 	
 	date_patterns = {"datetime_format_1" : "(?P<datetime>\d{2}/\d{2}/\d{2}\s{1}\d{1,2}:\d{1,2})", "datetime_format_2" : "(?P<datetime>\d{2}/\d{2}/\d{2},\s{1}\d{1,2}:\d{1,2})", "datetime_format_3" : "(?P<datetime>\d{2}/\d{2}/\d{2},\s{1}\d{1,2}:\d{1,2}\s{1}(A|P)M)", "datetime_format_4" : "(?P<datetime>\d{2}/\d{2}/\d{4},\s{1}\d{1,2}:\d{1,2})", "datetime_format_5" : "(?P<datetime>\d{2}/\d{2}/\d{4}\s{1}\d{1,2}:\d{1,2})", 
-	"datetime_format_6" : "(?P<datetime>\d{2}/\d{2}/\d{2}\s{1}\d{1,2}:\d{1,2}\s{1}da\s{1}(manhã|tarde|noite))"} 
+	"datetime_format_6" : "(?P<datetime>\d{2}/\d{2}/\d{2}\s{1}\d{1,2}:\d{1,2}\s{1}(da manhã|da tarde|da noite|meio-dia|meia-noite|da madrugada))"} 
 	#date_format_1 dd/MM/yyyy HH24:mm #date_format_2 dd/MM/yyyy, HH24:mm #date_format_3 dd/MM/yyyy, HH:mm
 	message_pattern = "\s{1}-\s{1}(?P<name>(.*?)):\s{1}(?P<message>(.*?))$"
 	action_pattern = "\s{1}-\s{1}(?P<action>(.*?))$"
@@ -92,18 +92,28 @@ class SPIWhatsAppEmailsParser(object):
 			#normalize date data
 			# datetime_format_1 and 2 HH24
 			#datetime_format_3 HH12 AM - PM or dayshift
-			matchDateTime = re.search(r'(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2}),\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})\s[1](?P<ampm>((A|P)M))',datetime)
+			
+			matchDateTime = re.search(r'(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2})\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})\s{1}(?P<dayshift>(da manhã|da tarde|da noite|meio-dia|meia-noite|da madrugada))',datetime)
 			if not matchDateTime is None:
+				print 'dayshift', datetime
 				HH12 = 0
-				if matchDateTime.group('ampm').contains('P'):
+				#exceptions
+				if matchDateTime.group('dayshift')=='da noite':
 					HH12 = 12
+				if (matchDateTime.group('dayshift')=='da tarde' and int(matchDateTime.group('hour')) != 12):
+					HH12 = 12
+				if (matchDateTime.group('dayshift')=='da madrugada' and int(matchDateTime.group('hour')) == 12):
+					HH12 = -12
+				if matchDateTime.group('dayshift')=='meia-noite':
+					HH12 = -12
+					
 				dt = DateTime(int(matchDateTime.group('year'))+2000,int(matchDateTime.group('month')),int(matchDateTime.group('day')),int(matchDateTime.group('hour'))+HH12,int(matchDateTime.group('minute')),0)
 				self.datetime = TimeStamp(dt)
 			else:
-				matchDateTime = re.search(r'(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2})\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})\s{1}da\s{1}(?P<dayshift>(manhã|tarde|noite))',datetime)
+				matchDateTime = re.search(r'(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2}),\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})\s[1](?P<ampm>((A|P)M))',datetime)
 				if not matchDateTime is None:
 					HH12 = 0
-					if not matchDateTime.group('dayshift')=='manhã':
+					if matchDateTime.group('ampm').contains('P'):
 						HH12 = 12
 					dt = DateTime(int(matchDateTime.group('year'))+2000,int(matchDateTime.group('month')),int(matchDateTime.group('day')),int(matchDateTime.group('hour'))+HH12,int(matchDateTime.group('minute')),0)
 					self.datetime = TimeStamp(dt)
