@@ -1,3 +1,4 @@
+# encoding: utf-8
 from physical import *
 import SQLiteParser
 from System.Convert import IsDBNull
@@ -19,6 +20,7 @@ v1 - [24-10-17]: Wrote original code
 v2 - [11-09-18]: Expanded date_patterns to variations based on device's configuration.
 v3 - [14-11-18]: Added new data format found in exams
 v4 - [07-02-19]: Solution to extraction without contact file and extractions with "no-sense" encoding (strange prefix bytes in messagelines)
+v5 - [25-02-19]: Added new date format with dayshift [morning, afternoon, ... :/]
 
 Part of this code is based on project
 https://github.com/hiimivantang/whatsapp-analytics licensed under the MIT License
@@ -67,7 +69,8 @@ class SPIWhatsAppEmailsParser(object):
 	chats = {}
 	sec_chats = {}
 	
-	date_patterns = {"datetime_format_1" : "(?P<datetime>\d{2}/\d{2}/\d{2}\s{1}\d{1,2}:\d{1,2})", "datetime_format_2" : "(?P<datetime>\d{2}/\d{2}/\d{2},\s{1}\d{1,2}:\d{1,2})", "datetime_format_3" : "(?P<datetime>\d{2}/\d{2}/\d{2},\s{1}\d{1,2}:\d{1,2}\s{1}(A|P)M)", "datetime_format_4" : "(?P<datetime>\d{2}/\d{2}/\d{4},\s{1}\d{1,2}:\d{1,2})", "datetime_format_5" : "(?P<datetime>\d{2}/\d{2}/\d{4}\s{1}\d{1,2}:\d{1,2})"} 
+	date_patterns = {"datetime_format_1" : "(?P<datetime>\d{2}/\d{2}/\d{2}\s{1}\d{1,2}:\d{1,2})", "datetime_format_2" : "(?P<datetime>\d{2}/\d{2}/\d{2},\s{1}\d{1,2}:\d{1,2})", "datetime_format_3" : "(?P<datetime>\d{2}/\d{2}/\d{2},\s{1}\d{1,2}:\d{1,2}\s{1}(A|P)M)", "datetime_format_4" : "(?P<datetime>\d{2}/\d{2}/\d{4},\s{1}\d{1,2}:\d{1,2})", "datetime_format_5" : "(?P<datetime>\d{2}/\d{2}/\d{4}\s{1}\d{1,2}:\d{1,2})", 
+	"datetime_format_6" : "(?P<datetime>\d{2}/\d{2}/\d{2}\s{1}\d{1,2}:\d{1,2}\s{1}da\s{1}(manhã|tarde|noite))"} 
 	#date_format_1 dd/MM/yyyy HH24:mm #date_format_2 dd/MM/yyyy, HH24:mm #date_format_3 dd/MM/yyyy, HH:mm
 	message_pattern = "\s{1}-\s{1}(?P<name>(.*?)):\s{1}(?P<message>(.*?))$"
 	action_pattern = "\s{1}-\s{1}(?P<action>(.*?))$"
@@ -88,23 +91,30 @@ class SPIWhatsAppEmailsParser(object):
 			#print datetime
 			#normalize date data
 			# datetime_format_1 and 2 HH24
-			matchDateTime = re.search(r'(?P<day>\d{1,2})/(?P<month>\d{1,2})/(?P<year>\d{2,4})[,]{0,1}\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})',datetime)
-			yearPlus = 0
+			#datetime_format_3 HH12 AM - PM or dayshift
+			matchDateTime = re.search(r'(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2}),\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})\s[1](?P<ampm>((A|P)M))',datetime)
 			if not matchDateTime is None:
-				if (len(matchDateTime.group('year'))==2):
-					yearPlus = 2000
-				dt = DateTime(int(matchDateTime.group('year'))+yearPlus,int(matchDateTime.group('month')),int(matchDateTime.group('day')),int(matchDateTime.group('hour')),int(matchDateTime.group('minute')),0)
+				HH12 = 0
+				if matchDateTime.group('ampm').contains('P'):
+					HH12 = 12
+				dt = DateTime(int(matchDateTime.group('year'))+2000,int(matchDateTime.group('month')),int(matchDateTime.group('day')),int(matchDateTime.group('hour'))+HH12,int(matchDateTime.group('minute')),0)
 				self.datetime = TimeStamp(dt)
-			#datetime_format_3 HH12 AM - PM
 			else:
-				matchDateTime = re.search(r'(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2}),\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})\s[1](?P<ampm>((A|P)M))',datetime)
+				matchDateTime = re.search(r'(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2})\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})\s{1}da\s{1}(?P<dayshift>(manhã|tarde|noite))',datetime)
 				if not matchDateTime is None:
 					HH12 = 0
-					if matchDateTime.group('ampm').contains('P'):
+					if not matchDateTime.group('dayshift')=='manhã':
 						HH12 = 12
 					dt = DateTime(int(matchDateTime.group('year'))+2000,int(matchDateTime.group('month')),int(matchDateTime.group('day')),int(matchDateTime.group('hour'))+HH12,int(matchDateTime.group('minute')),0)
 					self.datetime = TimeStamp(dt)
-			
+				else:
+					matchDateTime = re.search(r'(?P<day>\d{1,2})/(?P<month>\d{1,2})/(?P<year>\d{2,4})[,]{0,1}\s{1}(?P<hour>\d{1,2}):(?P<minute>\d{1,2})',datetime)
+					yearPlus = 0
+					if not matchDateTime is None:
+						if (len(matchDateTime.group('year'))==2):
+							yearPlus = 2000
+						dt = DateTime(int(matchDateTime.group('year'))+yearPlus,int(matchDateTime.group('month')),int(matchDateTime.group('day')),int(matchDateTime.group('hour')),int(matchDateTime.group('minute')),0)
+						self.datetime = TimeStamp(dt)
 			self.name = name
 			self.message = message
 			self.action = action
@@ -272,17 +282,6 @@ class SPIWhatsAppEmailsParser(object):
 			contact.Entries.Add(ph)
 			ds.Models[Contact].Add(contact)
 	
-	def parse_whatsapp_message(self,lines):
-		linst_of_messages = []
-		set_of_sender = set()
-		for l in lines:
-			matchChat = re.search(r'(?P<date>\d{2}/\d{2}/\d{2})(?P<time>\s{1}\d{2}:\d{2})\s{1}-\s{1}(?P<name>(.*?)):\s{1}(?P<message>(.*?))$',line)
-			if matchChat:
-				print matchChat.group()
-				print matchChat.group(1)
-				print matchChat.group(2)
-			else:
-				print "no match!!"
 	
 	def stripNonAlphaNum(self,text):
 		return re.compile(r'\W+', re.UNICODE).split(text)
@@ -298,7 +297,7 @@ class SPIWhatsAppEmailsParser(object):
 		return None
 		
 	def decode_messages(self):
-		files = [f for f in os.listdir(currentDir) if re.search(r'Conversa do WhatsApp com (.*)\.txt', f)]
+		files = [f for f in os.listdir(currentDir) if re.search(r'(.*)\.txt', f)]
 		repeated_chats = []
 		for f in files:
 			#todo: remove repeated extraction files.
@@ -315,6 +314,9 @@ class SPIWhatsAppEmailsParser(object):
 			chat = Chat()
 			chat.Deleted = DeletedState.Intact
 			rchat_name_parser = re.search(r'Conversa do WhatsApp com (.*)\.txt', f)
+			print rchat_name_parser
+			if rchat_name_parser is None:
+				rchat_name_parser = re.search(r'(.*@.*)\.txt', f)
 			chat.Id.Value = rchat_name_parser.group(1)
 			chat.Source.Value = "WhatsApp (EmailExport)"
 			ws_parser = self.WhatsApp_Email_Parser()
@@ -378,4 +380,3 @@ pathContactFile = currentDir+'/contacts.txt'
 results = SPIWhatsAppEmailsParser().parse()
 
 print "Finished",('The script took {0} seconds !'.format(time.time() - startTime))
-
